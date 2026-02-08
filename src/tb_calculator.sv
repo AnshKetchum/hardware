@@ -44,6 +44,8 @@ module tb_calculator import calculator_pkg::*; ();
         // Dump waveforms
         $dumpfile("waves.vcd");
         $dumpvars(0, tb_calculator);
+        // $shm_open("waves.shm");
+        // $shm_probe("AC");
         
         $display("\n--------------Beginning Simulation!--------------\n");
         $display("Time: %t", $time);
@@ -82,24 +84,24 @@ module tb_calculator import calculator_pkg::*; ();
     begin
         $display("--------------Initializing Signals---------------\n");
         $display("Time: %t", $time);
+
         // Load memory files AFTER SRAM's initial wipe at 1ns
         #2;
 
         // Initialize control signals
         rst_tb              = 1'b1;
         read_start_addr_tb  = 10'd0;
-        read_end_addr_tb    = 10'd511;  // 0x1FF
-        write_start_addr_tb = 10'd768;  // 0x300
-        write_end_addr_tb   = 10'd1023; // 0x3FF       write_end_addr_tb   = 10'd1023; // 0x3FF
+        read_end_addr_tb    = 10'd511;
+        write_start_addr_tb = 10'd768;
+        write_end_addr_tb   = 10'd1023;
 
         $readmemb("memory_pre_state_lower.txt", DUT.sram_A.memory_mode_inst.memory);
         $readmemb("memory_pre_state_upper.txt", DUT.sram_B.memory_mode_inst.memory);
-        
-        // Load expected post-state files for comparison
+
         $readmemb("memory_post_state_lower.txt", expected_post_lower);
         $readmemb("memory_post_state_upper.txt", expected_post_upper);
-        
     end
     endtask
+
 	
 endmodule
