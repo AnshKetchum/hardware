@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module tb_calculator import calculator_pkg::*; ();
     //=============== Generate the clock =================
     localparam CLK_PERIOD = 20; //Set clock period: 20 ns
@@ -29,6 +30,9 @@ module tb_calculator import calculator_pkg::*; ();
     ) ;
     
     initial begin
+        $dumpfile("waves.vcd");
+        $dumpvars(0, tb_calculator);
+        $dumpall;
         // Initialize and run clock in background
         clk_tb = 1'b0;
         fork
@@ -37,12 +41,6 @@ module tb_calculator import calculator_pkg::*; ();
                 #(CLK_PERIOD*DUTY_CYCLE) clk_tb = 1'b0;
             end
         join_none
-        
-        //These two lines just allow visibility of signals in the simulation
-        // $shm_open("waves.shm");
-        // $shm_probe("AC");
-        $dumpfile("waves.vcd");
-        $dumpvars(0, tb_calculator);
         $display("\n--------------Beginning Simulation!--------------\n");
         $display("Time: %t", $time);
         @(posedge clk_tb);
@@ -60,6 +58,7 @@ module tb_calculator import calculator_pkg::*; ();
         $display("Cycle Count: %0d cycles (from S_IDLE to S_END)", DUT.u_ctrl.cycle_count);
         $writememb("sim_memory_post_state_lower.txt", DUT.sram_A.memory_mode_inst.memory);
         $writememb("sim_memory_post_state_upper.txt", DUT.sram_B.memory_mode_inst.memory);
+        $dumpflush;
         $finish;
     end
     
