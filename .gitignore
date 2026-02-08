@@ -1,0 +1,4 @@
+*.out
+*.fst
+*.vcd
+*.log
