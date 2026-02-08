@@ -120,10 +120,11 @@ module controller import calculator_pkg::*;(
 				S_ADD: begin
 					// r_data now contains operand B (requested in S_READ2)
 					op_b_reg <= r_data;
-				end
-				S_ADD2: begin
 					// Capture carry out from lower addition (performed in S_ADD)
 					carry_reg <= carry_out;
+				end
+				S_ADD2: begin
+					// Carry is already captured from S_ADD
 				end
 				S_WRITE: begin
 					// Move to next pair of operands and next write location
