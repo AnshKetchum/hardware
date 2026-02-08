@@ -1,10 +1,12 @@
-`timescale 1ns/1ps
 module tb_calculator import calculator_pkg::*; ();
     //=============== Generate the clock =================
     localparam CLK_PERIOD = 20; //Set clock period: 20 ns
     localparam DUTY_CYCLE = 0.5;
     //define clock
-    logic clk_tb;
+    logic clk_tb = 1'b0;
+    
+    // Simple always-based clock generation
+    always #(CLK_PERIOD*DUTY_CYCLE) clk_tb = ~clk_tb;
     
     //======== Define wires going into your module ========
     logic             rst_tb;   // global
@@ -30,64 +32,55 @@ module tb_calculator import calculator_pkg::*; ();
     ) ;
     
     initial begin
-        $dumpfile("waves.vcd");
-        $dumpvars(0, tb_calculator);
-        $dumpall;
-        // Initialize and run clock in background
-        clk_tb = 1'b0;
-        fork
-            forever begin
-                #(CLK_PERIOD*DUTY_CYCLE) clk_tb = 1'b1;
-                #(CLK_PERIOD*DUTY_CYCLE) clk_tb = 1'b0;
-            end
-        join_none
-        $display("\n--------------Beginning Simulation!--------------\n");
-        $display("Time: %t", $time);
-        @(posedge clk_tb);
-        initialize_signals();
-        fork begin
-            wait(DUT.u_ctrl.state == S_END);
-            #100;
-        end
-        begin
-            #100000;
-        end
-        join_any
-        $display("\n-------------Finished Simulation!----------------\n");
-        $display("Time: %t", $time);
-        $display("Cycle Count: %0d cycles (from S_IDLE to S_END)", DUT.u_ctrl.cycle_count);
-        $writememb("sim_memory_post_state_lower.txt", DUT.sram_A.memory_mode_inst.memory);
-        $writememb("sim_memory_post_state_upper.txt", DUT.sram_B.memory_mode_inst.memory);
-        $dumpflush;
-        $finish;
-    end
-    
-    //Task to set the initial state of the signals. Task is called up above
-    task initialize_signals();
-    begin
-        $display("--------------Initializing Signals---------------\n");
-        $display("Time: %t", $time);
-
-        $readmemb("memory_pre_state_lower.txt", DUT.sram_A.memory_mode_inst.memory);
-        $readmemb("memory_pre_state_upper.txt", DUT.sram_B.memory_mode_inst.memory);
+        // Load memory files FIRST at time 0, before SRAM initializes
+        $readmemb("memory_pre_state_lower.txt", DUT.sram_A.memory);
+        $readmemb("memory_pre_state_upper.txt", DUT.sram_B.memory);
         
         // Load expected post-state files for comparison
         $readmemb("memory_post_state_lower.txt", expected_post_lower);
         $readmemb("memory_post_state_upper.txt", expected_post_upper);
-
-        rst_tb              = 1'b1;
-        read_start_addr_tb  = '0;
-        read_end_addr_tb    = 9'b011111111;
-        write_start_addr_tb = 9'b110000000;
-        write_end_addr_tb   = 9'b111111111;
         
-        // Hold reset for a few cycles
+        // Initialize control signals
+        rst_tb              = 1'b1;
+        read_start_addr_tb  = 10'd0;
+        read_end_addr_tb    = 10'd511;  // 0x1FF
+        write_start_addr_tb = 10'd768;  // 0x300
+        write_end_addr_tb   = 10'd1023; // 0x3FF
+        
+        // Dump waveforms
+        $dumpfile("waves.vcd");
+        $dumpvars(0, tb_calculator);
+        
+        $display("\n--------------Beginning Simulation!--------------\n");
+        $display("Time: %t", $time);
+        
+        // Wait a few clock cycles with reset high
         repeat(5) @(posedge clk_tb);
-        rst_tb              = 1'b0;
-        $display("Reset released at time %t", $time);
-
-        rst_tb              = 1'b0;
+        
+        $display("--------------Releasing Reset---------------\n");
+        $display("Time: %t", $time);
+        rst_tb = 1'b0;
+        
+        // Wait for completion or timeout
+        fork 
+            begin
+                wait(DUT.u_ctrl.state == S_END);
+                #100;
+            end
+            begin
+                #100000;
+            end
+        join_any
+        
+        $display("\n-------------Finished Simulation!----------------\n");
+        $display("Time: %t", $time);
+        $display("Cycle Count: %0d cycles (from S_IDLE to S_END)", DUT.u_ctrl.cycle_count);
+        
+        // Write simulation results
+        $writememb("sim_memory_post_state_lower.txt", DUT.sram_A.memory);
+        $writememb("sim_memory_post_state_upper.txt", DUT.sram_B.memory);
+        
+        $finish;
     end
-    endtask
 	
 endmodule

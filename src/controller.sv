@@ -22,14 +22,12 @@ module controller import calculator_pkg::*;(
     output logic [MEM_WORD_SIZE-1:0]	w_data,
     output logic [ADDR_W-1:0]			r_addr,
     input  logic [MEM_WORD_SIZE-1:0]	r_data,
-
   	// Buffer Control (1 = upper, 0, = lower)
     output logic buffer_control,
   
   	// These go into adder
   	output logic [DATA_W-1:0] op_a,
     output logic [DATA_W-1:0] op_b,
-
 	// Carry input for adder
 	output logic carry_in,	// Carry input to adder
 	input  logic carry_out, // Carry output from adder
@@ -38,7 +36,6 @@ module controller import calculator_pkg::*;(
     input  logic [MEM_WORD_SIZE-1:0] buff_result
   
 ); 
-
 	// DO NOT MODIFY THIS BLOCK: Count how many cycles the controller has been active
 	logic [31:0] cycle_count;
 	always_ff @(posedge clk_i) begin
@@ -51,16 +48,28 @@ module controller import calculator_pkg::*;(
 	// You can change anything below this line. There is a skeleton but feel
 	// free to modify as much as you want.
 	//=========================================================================
-
 	// Declare state machine states
     state_t state, next;
-	buffer_loc_t buffer_loc;
-
-	// Registers to hold read data for current and next reads
-	logic [ADDR_W-1:0] r_ptr, w_ptr;
-  	logic [MEM_WORD_SIZE-1:0] op_a_reg = 0;
-	logic [MEM_WORD_SIZE-1:0] op_b_reg = 0; 
-	logic carry_reg = 0;
+	
+	// Registers to hold read data and address pointers
+	logic [ADDR_W-1:0] op_a_addr, op_b_addr, w_ptr;
+  	logic [MEM_WORD_SIZE-1:0] op_a_reg;
+	logic [MEM_WORD_SIZE-1:0] op_b_reg; 
+	logic carry_reg;
+	
+	// Intermediate wires for bit slicing (avoids iverilog warning)
+	logic [DATA_W-1:0] op_a_lower, op_a_upper;
+	logic [DATA_W-1:0] op_b_lower, op_b_upper;
+	
+	assign op_a_lower = op_a_reg[31:0];
+	assign op_a_upper = op_a_reg[63:32];
+	assign op_b_lower = op_b_reg[31:0];
+	assign op_b_upper = op_b_reg[63:32];
+	
+	// Calculate midpoint between read_start and read_end
+	// Operand A is in first half, Operand B is in second half
+	logic [ADDR_W-1:0] read_mid_addr;
+	assign read_mid_addr = read_start_addr + ((read_end_addr - read_start_addr + 1) >> 1);
 	
 	//Next state logic
 	always_comb begin
@@ -71,8 +80,8 @@ module controller import calculator_pkg::*;(
 			S_ADD:		 next = S_ADD2;
 			S_ADD2:		 next = S_WRITE;
 			S_WRITE: begin
-				//Check if reached end of address
-				if (r_ptr >= read_end_addr)
+				// Check if we've processed all operand A values
+				if (op_a_addr >= read_mid_addr - 1)
 					next = S_END;
 				else
 					next = S_READ;
@@ -81,95 +90,99 @@ module controller import calculator_pkg::*;(
 			default: next = S_IDLE;
 		endcase
 	end
-
-	// Sequential part of state machine implementation, move points around
+	
+	// Sequential part of state machine implementation
 	always_ff @(posedge clk_i) begin
-
 		if (rst_i) begin
-			r_ptr <= read_start_addr;
+			op_a_addr <= read_start_addr;
+			op_b_addr <= read_mid_addr;
 			w_ptr <= write_start_addr;
-			op_a_reg <= 0;
-			op_b_reg <= 0;
-			carry_reg <= 0;
-			
-			// update state
+			op_a_reg <= '0;
+			op_b_reg <= '0;
+			carry_reg <= '0;
 			state <= S_IDLE;
 		end
-
 		else begin
-
+			state <= next;
+			
+			// CRITICAL: Account for 1-cycle SRAM read latency
+			// r_data has the data from the PREVIOUS cycle's read request
 			case (state)
-
 				S_READ2: begin
+					// r_data now contains operand A (requested in S_READ)
 					op_a_reg <= r_data;
-					r_ptr <= r_ptr + 1'b1;
 				end
-
 				S_ADD: begin
+					// r_data now contains operand B (requested in S_READ2)
 					op_b_reg <= r_data;
-					r_ptr <= r_ptr + 1'b1;
+					// Also capture carry out from lower addition
 					carry_reg <= carry_out;
 				end
-
 				S_WRITE: begin
-  					w_ptr <= w_ptr + 1;
+					// Move to next pair of operands and next write location
+  					op_a_addr <= op_a_addr + 1'b1;
+					op_b_addr <= op_b_addr + 1'b1;
+					w_ptr <= w_ptr + 1'b1;
 				end
-
 			endcase
-
-			state <= next;
 		end
 	end
-
-
+	
 	// Combinational output logic
 	always_comb begin
         // Default values
-       	write = 0;
-		read  = 0;
-    	r_addr = r_ptr;
+       	write = 1'b0;
+		read  = 1'b0;
+    	r_addr = op_a_addr;  // Default to reading op_a address
     	w_addr = w_ptr;
 		w_data = buff_result;
-    	op_a   = 0;
-    	op_b   = 0;
-    	carry_in = 0;
+    	op_a   = '0;
+    	op_b   = '0;
+    	carry_in = 1'b0;
 		buffer_control = LOWER;  
-
-
+		
         case (state)  
             S_IDLE: begin
                 // Do nothing
             end
-
-			S_READ, S_READ2: begin
- 				read   = 1;
+			S_READ: begin
+				// Request read of operand A
+				// Data will be available next cycle in r_data
+ 				read = 1'b1;
+				r_addr = op_a_addr;
+			end
+			S_READ2: begin
+				// Request read of operand B
+				// Data will be available next cycle in r_data
+				// NOTE: r_data currently has operand A from previous cycle
+				read = 1'b1;
+				r_addr = op_b_addr;
 			end			
-
 			S_ADD: begin
-			//Lower addition
-				op_a = op_a_reg[31:0];
-				op_b = op_b_reg[31:0];
-				carry_in = 0;
+				// Perform lower 32-bit addition
+				// NOTE: r_data currently has operand B from previous cycle
+				op_a = op_a_lower;
+				op_b = op_b_lower;
+				carry_in = 1'b0;
 				buffer_control = LOWER;
 			end
-
 			S_ADD2: begin
-				//Upper addition
-				op_a = op_a_reg[63:32];
-				op_b = op_b_reg[63:32];
+				// Perform upper 32-bit addition with carry
+				op_a = op_a_upper;
+				op_b = op_b_upper;
 				carry_in = carry_reg;
 				buffer_control = UPPER;
 			end
-
 			S_WRITE: begin
-				write = 1;
+				// Write result to memory
+				write = 1'b1;
+				w_data = buff_result;
+				w_addr = w_ptr;
 			end
-
             S_END: begin
                 // Defaults
             end
         endcase
     end
 	
-	
-  endmodule
+endmodule
