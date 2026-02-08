@@ -80,26 +80,54 @@ module tb_calculator import calculator_pkg::*; ();
     end
 
     //Task to set the initial state of the signals. Task is called up above
+    // task initialize_signals();
+    // begin
+    //     $display("--------------Initializing Signals---------------\n");
+    //     $display("Time: %t", $time);
+
+    //     // Load memory files AFTER SRAM's initial wipe at 1ns
+    //     #2;
+
+    //     // Initialize control signals
+    //     rst_tb              = 1'b1;
+    //     read_start_addr_tb  = 10'd0;
+    //     read_end_addr_tb    = 10'd511;
+    //     write_start_addr_tb = 10'd768;
+    //     write_end_addr_tb   = 10'd1023;
+
+    //     $readmemb("memory_pre_state_lower.txt", DUT.sram_A.memory_mode_inst.memory);
+    //     $readmemb("memory_pre_state_upper.txt", DUT.sram_B.memory_mode_inst.memory);
+
+    //     $readmemb("memory_post_state_lower.txt", expected_post_lower);
+    //     $readmemb("memory_post_state_upper.txt", expected_post_upper);
+    // end
+    // endtask
+
     task initialize_signals();
     begin
         $display("--------------Initializing Signals---------------\n");
         $display("Time: %t", $time);
 
-        // Load memory files AFTER SRAM's initial wipe at 1ns
         #2;
 
-        // Initialize control signals
         rst_tb              = 1'b1;
         read_start_addr_tb  = 10'd0;
         read_end_addr_tb    = 10'd511;
         write_start_addr_tb = 10'd768;
         write_end_addr_tb   = 10'd1023;
 
-        $readmemb("memory_pre_state_lower.txt", DUT.sram_A.memory_mode_inst.memory);
-        $readmemb("memory_pre_state_upper.txt", DUT.sram_B.memory_mode_inst.memory);
+        // Fill both SRAMs with all 1's
+        for (i = 0; i < 1024; i = i + 1) begin
+            DUT.sram_A.memory_mode_inst.memory[i] = 32'hFFFFFFFF;
+            DUT.sram_B.memory_mode_inst.memory[i] = 32'hFFFFFFFF;
+        end
 
-        $readmemb("memory_post_state_lower.txt", expected_post_lower);
-        $readmemb("memory_post_state_upper.txt", expected_post_upper);
+        // Expected result arrays (optional)
+        for (i = 0; i < 1024; i = i + 1) begin
+            expected_post_lower[i] = 32'hFFFFFFFE;
+            expected_post_upper[i] = 32'h00000001;
+        end
+
     end
     endtask
 
