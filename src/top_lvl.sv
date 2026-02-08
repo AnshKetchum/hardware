@@ -65,7 +65,7 @@ module top_lvl import calculator_pkg::*; (
         .DI         (w_data_lower),
         .AD         (write ? w_addr : r_addr),
         .CLKin      (clk),
-        .EN         (1'b1),
+        .EN         (read | write),
         .R_WB       (~write),
 
         // DO NOT MODIFY THE FOLLOWING PINS
@@ -88,7 +88,7 @@ module top_lvl import calculator_pkg::*; (
         .DI         (w_data_upper),
         .AD         (write ? w_addr : r_addr),
         .CLKin      (clk),
-        .EN         (1'b1),
+        .EN         (read | write),
         .R_WB       (~write),
 
         // DO NOT MODIFY THE FOLLOWING PINS

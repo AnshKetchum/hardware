@@ -65,6 +65,11 @@ module controller import calculator_pkg::*;(
 	assign op_a_upper = op_a_reg[63:32];
 	assign op_b_lower = op_b_reg[31:0];
 	assign op_b_upper = op_b_reg[63:32];
+
+	// Helper for r_data slicing
+	logic [DATA_W-1:0] r_data_lower, r_data_upper;
+	assign r_data_lower = r_data[31:0];
+	assign r_data_upper = r_data[63:32];
 	
 	// Calculate midpoint between read_start and read_end
 	// Operand A is in first half, Operand B is in second half
@@ -115,7 +120,9 @@ module controller import calculator_pkg::*;(
 				S_ADD: begin
 					// r_data now contains operand B (requested in S_READ2)
 					op_b_reg <= r_data;
-					// Also capture carry out from lower addition
+				end
+				S_ADD2: begin
+					// Capture carry out from lower addition (performed in S_ADD)
 					carry_reg <= carry_out;
 				end
 				S_WRITE: begin
@@ -123,6 +130,8 @@ module controller import calculator_pkg::*;(
   					op_a_addr <= op_a_addr + 1'b1;
 					op_b_addr <= op_b_addr + 1'b1;
 					w_ptr <= w_ptr + 1'b1;
+					// Reset carry for next addition
+					carry_reg <= 1'b0;
 				end
 			endcase
 		end
@@ -160,17 +169,18 @@ module controller import calculator_pkg::*;(
 			end			
 			S_ADD: begin
 				// Perform lower 32-bit addition
-				// NOTE: r_data currently has operand B from previous cycle
-				op_a = op_a_lower;
-				op_b = op_b_lower;
+				// NOTE: op_b_reg is updated at the END of this cycle
+				// So we use r_data directly for op_b
+				op_a = op_a_reg[31:0];
+				op_b = r_data[31:0];
 				carry_in = 1'b0;
 				buffer_control = LOWER;
 			end
 			S_ADD2: begin
 				// Perform upper 32-bit addition with carry
-				op_a = op_a_upper;
-				op_b = op_b_upper;
-				carry_in = carry_reg;
+				op_a = op_a_reg[63:32];
+				op_b = op_b_reg[63:32];
+				carry_in = carry_reg; 
 				buffer_control = UPPER;
 			end
 			S_WRITE: begin

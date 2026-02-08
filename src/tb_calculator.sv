@@ -32,9 +32,10 @@ module tb_calculator import calculator_pkg::*; ();
     ) ;
     
     initial begin
-        // Load memory files FIRST at time 0, before SRAM initializes
-        $readmemb("memory_pre_state_lower.txt", DUT.sram_A.memory);
-        $readmemb("memory_pre_state_upper.txt", DUT.sram_B.memory);
+        // Load memory files AFTER SRAM's initial wipe at 1ns
+        #2;
+        $readmemb("memory_pre_state_lower.txt", DUT.sram_A.memory_mode_inst.memory);
+        $readmemb("memory_pre_state_upper.txt", DUT.sram_B.memory_mode_inst.memory);
         
         // Load expected post-state files for comparison
         $readmemb("memory_post_state_lower.txt", expected_post_lower);
@@ -53,6 +54,9 @@ module tb_calculator import calculator_pkg::*; ();
         
         $display("\n--------------Beginning Simulation!--------------\n");
         $display("Time: %t", $time);
+        
+        // Wait for SRAM to settle
+        #100;
         
         // Wait a few clock cycles with reset high
         repeat(5) @(posedge clk_tb);
@@ -77,8 +81,8 @@ module tb_calculator import calculator_pkg::*; ();
         $display("Cycle Count: %0d cycles (from S_IDLE to S_END)", DUT.u_ctrl.cycle_count);
         
         // Write simulation results
-        $writememb("sim_memory_post_state_lower.txt", DUT.sram_A.memory);
-        $writememb("sim_memory_post_state_upper.txt", DUT.sram_B.memory);
+        $writememb("sim_memory_post_state_lower.txt", DUT.sram_A.memory_mode_inst.memory);
+        $writememb("sim_memory_post_state_upper.txt", DUT.sram_B.memory_mode_inst.memory);
         
         $finish;
     end
