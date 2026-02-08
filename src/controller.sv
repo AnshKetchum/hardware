@@ -110,7 +110,6 @@ module controller import calculator_pkg::*;(
 		else begin
 			state <= next;
 			
-			// CRITICAL: Account for 1-cycle SRAM read latency
 			// r_data has the data from the PREVIOUS cycle's read request
 			case (state)
 				S_READ2: begin
