@@ -37,10 +37,10 @@ module controller import calculator_pkg::*;(
   
 ); 
 	// DO NOT MODIFY THIS BLOCK: Count how many cycles the controller has been active
-	logic [31:0] cycle_count;
+	logic [DATA_W-1:0] cycle_count;
 	always_ff @(posedge clk_i) begin
 		if (rst_i)
-			cycle_count <= 32'd0;
+			cycle_count <= 0;
 		else
 			cycle_count <= cycle_count + 1'b1;
 	end
@@ -61,15 +61,15 @@ module controller import calculator_pkg::*;(
 	logic [DATA_W-1:0] op_a_lower, op_a_upper;
 	logic [DATA_W-1:0] op_b_lower, op_b_upper;
 	
-	assign op_a_lower = op_a_reg[31:0];
-	assign op_a_upper = op_a_reg[63:32];
-	assign op_b_lower = op_b_reg[31:0];
-	assign op_b_upper = op_b_reg[63:32];
+	assign op_a_lower = op_a_reg[DATA_W-1:0];
+	assign op_a_upper = op_a_reg[MEM_WORD_SIZE-1:DATA_W];
+	assign op_b_lower = op_b_reg[DATA_W-1:0];
+	assign op_b_upper = op_b_reg[MEM_WORD_SIZE-1:DATA_W];
 
 	// Helper for r_data slicing
 	logic [DATA_W-1:0] r_data_lower, r_data_upper;
-	assign r_data_lower = r_data[31:0];
-	assign r_data_upper = r_data[63:32];
+	assign r_data_lower = r_data[DATA_W-1:0];
+	assign r_data_upper = r_data[MEM_WORD_SIZE-1:DATA_W];
 	
 	// Calculate midpoint between read_start and read_end
 	// Operand A is in first half, Operand B is in second half
@@ -172,15 +172,15 @@ module controller import calculator_pkg::*;(
 				// Perform lower 32-bit addition
 				// NOTE: op_b_reg is updated at the END of this cycle
 				// So we use r_data directly for op_b
-				op_a = op_a_reg[31:0];
-				op_b = r_data[31:0];
+				op_a = op_a_reg[DATA_W-1:0];
+				op_b = r_data[DATA_W-1:0];
 				carry_in = 1'b0;
 				buffer_control = LOWER;
 			end
 			S_ADD2: begin
 				// Perform upper 32-bit addition with carry
-				op_a = op_a_reg[63:32];
-				op_b = op_b_reg[63:32];
+				op_a = op_a_reg[MEM_WORD_SIZE-1:DATA_W];
+				op_b = op_b_reg[MEM_WORD_SIZE-1:DATA_W];
 				carry_in = carry_reg; 
 				buffer_control = UPPER;
 			end
