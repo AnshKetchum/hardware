@@ -1,4 +1,5 @@
 module tb_calculator import calculator_pkg::*; ();
+
     //=============== Generate the clock =================
     localparam CLK_PERIOD = 20; //Set clock period: 20 ns
     localparam DUTY_CYCLE = 0.5;
@@ -11,7 +12,7 @@ module tb_calculator import calculator_pkg::*; ();
 		#(CLK_PERIOD*DUTY_CYCLE) clk_tb = 1'b1; //wait duty cycle then set clock high
 		#(CLK_PERIOD*DUTY_CYCLE) clk_tb = 1'b0; //wait duty cycle then set clock low
 	end
-	end 
+	end
 
     //======== Define wires going into your module ========
     logic             rst_tb;   // global
@@ -39,37 +40,22 @@ module tb_calculator import calculator_pkg::*; ();
         .write_start_addr   (write_start_addr_tb),
         .write_end_addr     (write_end_addr_tb)
     ) ;
-    
+
     initial begin
-        // Dump waveforms
-        $dumpfile("waves.vcd");
-        $dumpvars(0, tb_calculator);
-        // $shm_open("waves.shm");
-        // $shm_probe("AC");
-        
+        //These two lines just allow visibility of signals in the simulation
+        $shm_open("waves.shm");
+        $shm_probe("AC");
         $display("\n--------------Beginning Simulation!--------------\n");
         $display("Time: %t", $time);
+        @(posedge clk_tb);
         initialize_signals();
-
-        // Wait for SRAM to settle
-        #100;
-        
-        // Wait a few clock cycles with reset high
-        repeat(5) @(posedge clk_tb);
-        
-        $display("--------------Releasing Reset---------------\n");
-        $display("Time: %t", $time);
-        rst_tb = 1'b0;
-        
-        // Wait for completion or timeout
-        fork 
-            begin
-                wait(DUT.u_ctrl.state == S_END);
-                #100;
-            end
-            begin
-                #100000;
-            end
+        fork begin
+            wait(DUT.u_ctrl.state == S_END);
+            #100;
+        end
+        begin
+            #100000;
+        end
         join_any
         $display("\n-------------Finished Simulation!----------------\n");
         $display("Time: %t", $time);
@@ -80,56 +66,27 @@ module tb_calculator import calculator_pkg::*; ();
     end
 
     //Task to set the initial state of the signals. Task is called up above
-    // task initialize_signals();
-    // begin
-    //     $display("--------------Initializing Signals---------------\n");
-    //     $display("Time: %t", $time);
-
-    //     // Load memory files AFTER SRAM's initial wipe at 1ns
-    //     #2;
-
-    //     // Initialize control signals
-    //     rst_tb              = 1'b1;
-    //     read_start_addr_tb  = 10'd0;
-    //     read_end_addr_tb    = 10'd511;
-    //     write_start_addr_tb = 10'd768;
-    //     write_end_addr_tb   = 10'd1023;
-
-    //     $readmemb("memory_pre_state_lower.txt", DUT.sram_A.memory_mode_inst.memory);
-    //     $readmemb("memory_pre_state_upper.txt", DUT.sram_B.memory_mode_inst.memory);
-
-    //     $readmemb("memory_post_state_lower.txt", expected_post_lower);
-    //     $readmemb("memory_post_state_upper.txt", expected_post_upper);
-    // end
-    // endtask
-
     task initialize_signals();
     begin
         $display("--------------Initializing Signals---------------\n");
         $display("Time: %t", $time);
-
-        #2;
-
         rst_tb              = 1'b1;
-        read_start_addr_tb  = 10'd0;
-        read_end_addr_tb    = 10'd511;
-        write_start_addr_tb = 10'd768;
-        write_end_addr_tb   = 10'd1023;
+        read_start_addr_tb  = '0;
+        read_end_addr_tb    = 9'b011111111;
+        write_start_addr_tb = 9'b110000000;
+        write_end_addr_tb   = 9'b111111111;
 
-        // Fill both SRAMs with all 1's
-        for (i = 0; i < 1024; i = i + 1) begin
-            DUT.sram_A.memory_mode_inst.memory[i] = 32'hFFFFFFFF;
-            DUT.sram_B.memory_mode_inst.memory[i] = 32'hFFFFFFFF;
-        end
-
-        // Expected result arrays (optional)
-        for (i = 0; i < 1024; i = i + 1) begin
-            expected_post_lower[i] = 32'hFFFFFFFE;
-            expected_post_upper[i] = 32'h00000001;
-        end
-
+        $readmemb("memory_pre_state_lower.txt", DUT.sram_A.memory_mode_inst.memory);
+        $readmemb("memory_pre_state_upper.txt", DUT.sram_B.memory_mode_inst.memory);
+        
+        // Load expected post-state files for comparison
+        $readmemb("memory_post_state_lower.txt", expected_post_lower);
+        $readmemb("memory_post_state_upper.txt", expected_post_upper);
+        
+        @(posedge clk_tb);
+        rst_tb              = 1'b0;
     end
     endtask
 
 	
-endmodule
+endmodule 

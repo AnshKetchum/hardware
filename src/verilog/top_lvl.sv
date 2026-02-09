@@ -105,6 +105,11 @@ module top_lvl import calculator_pkg::*; (
         .vpwrpc     (1'b1)
     );
 
+    always_ff @(posedge clk) begin
+        $display("from top_lvl: r_data_lower = %b, r_data_upper = %b, r_addr = \n", r_data_lower, r_data_upper, r_addr);
+    end
+
+
   	// Adder
     logic [DATA_W-1:0] sum32;
     adder32 u_adder (
